@@ -15,9 +15,9 @@ public class SimpleCalc {
 
 	// constructor	
 	public SimpleCalc() {
-		utils = new ExprUtils;
-		valueStack = new ArrayStack<Double>; 
-		operatorStack = new ArrayStack<String>; 
+		utils = new ExprUtils();
+		valueStack = new ArrayStack<Double>(); 
+		operatorStack = new ArrayStack<String>(); 
 	}
 	
 	public static void main(String[] args) {
@@ -37,13 +37,15 @@ public class SimpleCalc {
 	 */
 	public void runCalc() {
 		String expression = ""; 
-		while (!expression.equals("q")){
+		do{
 			expression = Prompt.getString(" "); 
-			if (expression.equals("h"))
+			if (expression.equals("h")){
 				printHelp(); 
+				System.out.println();
+			}
 			else if (!expression.equals("q"))
-				evaluateExpression(utils.tokenizeExpression(expression)); 
-		}
+				System.out.println(evaluateExpression(utils.tokenizeExpression(expression))); 
+		} while (!expression.equals("q"));
 	}
 	
 	/**	Print help */
@@ -63,11 +65,115 @@ public class SimpleCalc {
 	 */
 	public double evaluateExpression(List<String> tokens) {
 		double value = 0;
-		for (int i = 0; i < tokens.size; i++){
-			String token = tokens.get(token); 
-			
+		for (int i = 0; i < tokens.size(); i++){
+			String token = tokens.get(i); 
+			if (token.length() == 1 && utils.isOperator(token.charAt(0))){
+				if (token.indexOf("(") != -1)
+					operatorStack.push(token);
+				else if (token.indexOf(")") != -1){
+					solveParantheses(); 
+					if (!operatorStack.isEmpty() && !operatorStack.peek().equals("(")
+						&& !operatorStack.peek().equals("+") && !operatorStack.peek().equals("-")){
+						calculate(operatorStack.pop(), "" + valueStack.pop());
+					}
+				}
+				else if (token.equals("^")){
+					operatorStack.push(token);
+					i = solveExponents(tokens, i); 
+				}
+				else{
+					String check = "+"; 
+					if (!operatorStack.isEmpty())
+						check = operatorStack.peek(); 
+					if (hasPrecedence(check, token) && !token.equals("+") && !token.equals("-")){
+						if (tokens.get(i + 1).equals("("))
+							operatorStack.push(token);
+						else{
+							calculate(token, tokens.get(i + 1));
+							i++; 
+						}
+					}
+					else{
+						operatorStack.push(token);
+					}
+				}
+			}
+			else{
+				valueStack.push(Double.parseDouble(token));
+			}
 		}
+		solveEquation();
+		value = valueStack.pop();
 		return value;
+	}
+
+	public void calculate(String operation, String operand){
+		double op = Double.parseDouble(operand);
+		if (operation.equals("+"))
+			valueStack.push(valueStack.pop() + op);
+		else if (operation.equals("-"))
+			valueStack.push(valueStack.pop() - op);
+		else if (operation.equals("*"))
+			valueStack.push(valueStack.pop() * op);
+		else if (operation.equals("/"))
+			valueStack.push(valueStack.pop() / op);
+		else if (operation.equals("%")){
+			valueStack.push(valueStack.pop() % op);
+		}
+		else
+			valueStack.push(Math.pow(valueStack.pop(), op));
+	}
+
+	public void solveParantheses(){
+		String token = "";
+		double total = 0.0;  
+		while (!token.equals("(")){
+			double temp = valueStack.pop(); 
+			token = operatorStack.pop(); 
+			if (token.equals("-"))
+				temp = temp * -1; 
+			total += temp; 
+		}
+		valueStack.push(total);
+	}
+
+	public int solveExponents(List<String> tokens, int index){
+		int counter = 1; 
+		while (operatorStack.peek().equals("^") && counter + index < tokens.size()){
+			String temp = tokens.get(index + counter); 
+			if (counter % 2 == 1)
+				valueStack.push(Double.parseDouble(temp));
+			else
+				operatorStack.push(temp); 
+			counter++; 
+		}
+		if (counter + index != tokens.size()){
+			operatorStack.pop();
+			counter -= 2; 
+		}
+
+		while (!operatorStack.isEmpty() && operatorStack.peek().equals("^")){
+			double exp = valueStack.pop(); 
+			double base = valueStack.pop(); 
+			exp = Math.pow(base, exp);
+			operatorStack.pop(); 
+			valueStack.push(exp);
+		}
+		return counter + index;
+	}
+
+	public void solveEquation(){
+		String token = "";
+		double total = 0.0;  
+		while (!operatorStack.isEmpty()){
+			double temp = valueStack.pop(); 
+			token = operatorStack.pop(); 
+			if (token.equals("-"))
+				temp = temp * -1; 
+			total += temp; 
+		}
+		total += valueStack.pop(); 
+		valueStack.push(total);
 	}
 	
 	/**
