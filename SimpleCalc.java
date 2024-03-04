@@ -154,7 +154,7 @@ public class SimpleCalc {
 	 * done, so just + and - remain, meaning the total can easily be computed
 	 * using LIFO
 	 */
-	public void solveParantheses(){
+	public void solveParantheses(){ 
 		String token = "";
 		double total = 0.0;  
 		while (!token.equals("(")){ // until reaching the opening bracket
@@ -194,7 +194,7 @@ public class SimpleCalc {
 		 * need to subtract 2 - 1 because you need to go one index higher to find
 		 * the nonexponent and 1 more because that loop part increments counter
 		 */
-		if (counter + index != tokens.size()){
+		if (!operatorStack.peek().equals("^")){
 			operatorStack.pop(); // remove nonexponent
 			counter -= 2; 
 		}
