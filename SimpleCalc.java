@@ -1,5 +1,5 @@
 import java.util.List;		// used by expression evaluator
-
+import java.util.ArrayList;
 /**
  *	a simple arithmetic calculator that receives an expression from the user
  *	and performs the given operations to calculate a sum
@@ -17,12 +17,16 @@ public class SimpleCalc {
 	
 	private ArrayStack<Double> valueStack;		// value stack
 	private ArrayStack<String> operatorStack;	// operator stack
+	private ArrayList<Identifier> variables; 	// variable database
 
 	// constructor	
 	public SimpleCalc() {
 		utils = new ExprUtils();
 		valueStack = new ArrayStack<Double>(); 
 		operatorStack = new ArrayStack<String>(); 
+		variables = new ArrayList<>(); 
+		variables.add(new Identifier("e", Math.E)); 
+		variables.add(new Identifier("pi", Math.PI)); 
 	}
 	
 	public static void main(String[] args) {
@@ -42,14 +46,24 @@ public class SimpleCalc {
 	 */
 	public void runCalc() {
 		String expression = ""; 
+		List<String> tokens = null; 
 		do{
 			expression = Prompt.getString(" "); 
 			if (expression.equals("h")){
 				printHelp(); 
 				System.out.println();
 			}
-			else if (!expression.equals("q")) // if not quit
-				System.out.println(evaluateExpression(utils.tokenizeExpression(expression))); 
+			else if (expression.equals("l")){
+				printVariables(); 
+			}
+			else if (!expression.equals("q")){ // if not quit{
+				tokens = utils.tokenizeExpression(expression); 
+				double answer = evaluateExpression(tokens); 
+				if (tokens.size() > 2 && tokens.get(1).equals("="))
+					System.out.printf("   %-8s= %f%n", tokens.get(0) + " ", answer);
+				else
+					System.out.println(answer); 
+			}
 		} while (!expression.equals("q"));
 	}
 	
@@ -63,6 +77,14 @@ public class SimpleCalc {
 		System.out.println("  parentheses '(' and ')'");
 	}
 	
+	/**Print variables */
+	public void printVariables() {
+		System.out.println("Variables:");
+		for (int i = 0; i < variables.size(); i++)
+			System.out.printf("   %-8s= %3f%n", variables.get(i).getName(), 
+				variables.get(i).getValue());
+	}
+	
 	/**
 	 *	Evaluate expression and return the value
 	 *	@param tokens	a List of String tokens making up an arithmetic expression
@@ -71,6 +93,8 @@ public class SimpleCalc {
 	public double evaluateExpression(List<String> tokens) {
 		double value = 0; // answer
 		for (int i = 0; i < tokens.size(); i++){ // adds all tokens to stacks
+			if (i == 0 && tokens.size() > 2 && tokens.get(1).equals("="))
+				i = 2; 
 			String token = tokens.get(i); 
 			if (token.length() == 1 && utils.isOperator(token.charAt(0))){ // if operator
 				/* if start of paratheses, just add to stack immediately */
@@ -82,7 +106,7 @@ public class SimpleCalc {
 					if (!operatorStack.isEmpty() && !operatorStack.peek().equals("(")
 						&& !operatorStack.peek().equals("+") && !operatorStack.peek().equals("-")){
 						//check if immediate calculations (*, /, %) can be done prior to paratheses
-						calculate(operatorStack.pop(), "" + valueStack.pop());
+						calculate(operatorStack.pop(), valueStack.pop());
 					}
 				}
 				else if (token.equals("^")){ // exponents (right to left)
@@ -91,7 +115,7 @@ public class SimpleCalc {
 					if (!operatorStack.isEmpty() && !operatorStack.peek().equals("(")
 						&& !operatorStack.peek().equals("+") && !operatorStack.peek().equals("-")){
 						//check if immediate calculations (*, /, %) can be done prior to paratheses
-						calculate(operatorStack.pop(), "" + valueStack.pop());
+						calculate(operatorStack.pop(), valueStack.pop());
 					}
 				}
 				else{ // any other operator
@@ -105,7 +129,7 @@ public class SimpleCalc {
 						else if (i + 2 < tokens.size() && tokens.get(i + 2).equals("^"))
 							operatorStack.push(token); // pause if next operator is exponent
 						else{
-							calculate(token, tokens.get(i + 1));
+							calculate(token, getNumber(tokens.get(i + 1)));
 							i++; // already added the next token in prior step
 						}
 					}
@@ -114,13 +138,37 @@ public class SimpleCalc {
 					}
 				}
 			}
-			else{ // number (just added to valueStack)
-				valueStack.push(Double.parseDouble(token));
-			}
+			else
+				valueStack.push(getNumber(token));
 		}
 		solveEquation(); // solve the rest of the equation (only addition and subtraction)
 		value = valueStack.pop();
+		if (tokens.size() > 2 && tokens.get(1).equals("=")){
+			boolean found = false; 
+			for (int j = 0; j < variables.size(); j++){
+				if (variables.get(j).getName().equals(tokens.get(0))){
+					variables.get(j).setValue(value);
+					found = true;
+				}
+			}
+			if (!found)
+				variables.add(new Identifier(tokens.get(0), value)); 
+		}
 		return value;
+	}
+	
+	public double getNumber(String token){
+		if (Character.isDigit(token.charAt(0))) // number (just added to valueStack)
+			return Double.parseDouble(token);
+		else{
+			for (int j = 0; j < variables.size(); j++){
+				if (variables.get(j).getName().equals(token)){
+					return variables.get(j).getValue();
+				}
+			}
+			variables.add(new Identifier(token, 0.0)); 
+			return 0.0; 
+		}
 	}
 
 	/**
@@ -130,8 +178,7 @@ public class SimpleCalc {
 	 * @param operation		what the symbol for the operation is 
 	 * @param operand		the second number in the expression
 	 */
-	public void calculate(String operation, String operand){
-		double op = Double.parseDouble(operand);
+	public void calculate(String operation, double op){
 		if (operation.equals("+"))
 			valueStack.push(valueStack.pop() + op);
 		else if (operation.equals("-"))
